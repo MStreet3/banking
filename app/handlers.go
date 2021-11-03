@@ -3,17 +3,18 @@ package app
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/mstreet3/banking/service"
 )
 
-type Customer struct {
-	Name string `json:"name"`
+type CustomerHandlers struct {
+	service service.CustomerService
 }
 
-func getAllCustomers(w http.ResponseWriter, r *http.Request) {
-	customers := []Customer{
-		{"Michael Street"},
-		{"John Doe"},
-	}
+func (ch *CustomerHandlers) getAllCustomers(w http.ResponseWriter, r *http.Request) {
+
+	customers, _ := ch.service.GetAllCustomers()
+
 	w.Header().Add("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(customers)
 
