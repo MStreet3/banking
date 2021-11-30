@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/mstreet3/banking/domain"
+	"github.com/mstreet3/banking/dto"
 	"github.com/mstreet3/banking/service"
 )
 
@@ -31,7 +31,7 @@ func (ch *CustomerHandlers) getAllCustomersByStatus(w http.ResponseWriter, r *ht
 	status := vars["status"]
 
 	/* access the customer repository via the service */
-	customers, err := ch.service.GetAllCustomersByStatus(domain.CustomerStatus(status))
+	customers, err := ch.service.GetAllCustomersByStatus(dto.CustomerStatus(status))
 
 	/* handle the response from the service */
 	if err != nil {

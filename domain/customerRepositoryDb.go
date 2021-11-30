@@ -7,6 +7,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
+	"github.com/mstreet3/banking/dto"
 	"github.com/mstreet3/banking/errs"
 )
 
@@ -28,15 +29,9 @@ func NewCustomerRepositoryDb() CustomerRepositoryDb {
 	}
 }
 
-func (d CustomerRepositoryDb) FindAllByStatus(status CustomerStatus) ([]Customer, *errs.AppError) {
+func (d CustomerRepositoryDb) FindAllByStatus(status dto.CustomerStatus) ([]Customer, *errs.AppError) {
 	findAllSql := "select customer_id, name, city, zipcode, date_of_birth, status from customers where status = ?"
-	var s int
-	switch status {
-	case ACTIVE:
-		s = 1
-	case INACTIVE:
-		s = 0
-	}
+	s := status.StatusAsQueryParam()
 	return handleCustomerSelectQuery(d.client, findAllSql, s)
 }
 
