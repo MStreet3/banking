@@ -24,7 +24,8 @@ func Start() {
 	}
 
 	/* implement a get all customers route */
-	router.HandleFunc("/customers", ch.getAllCustomers).Methods(http.MethodGet)
+	router.Path("/customers").Queries("status", "{status  }").HandlerFunc(ch.getAllCustomersByStatus).Methods(http.MethodGet)
+	router.Path("/customers").HandlerFunc(ch.getAllCustomers).Methods(http.MethodGet)
 	router.HandleFunc("/customers/{customer_id:[0-9]+}", ch.getCustomer).Methods(http.MethodGet)
 
 	err := http.ListenAndServe("localhost:8080", router)

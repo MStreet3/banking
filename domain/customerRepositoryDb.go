@@ -6,6 +6,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/mstreet3/banking/errs"
 )
 
 type CustomerRepositoryDb struct {
@@ -26,14 +27,43 @@ func NewCustomerRepositoryDb() CustomerRepositoryDb {
 	}
 }
 
-func (d CustomerRepositoryDb) FindAll() ([]Customer, error) {
+func (d CustomerRepositoryDb) FindAllByStatus(status CustomerStatus) ([]Customer, *errs.AppError) {
+	findAllSql := "select customer_id, name, city, zipcode, date_of_birth, status from customers where status = ?"
+	var s int
+	switch status {
+	case ACTIVE:
+		s = 1
+	case INACTIVE:
+		s = 0
+	}
+	rows, err := d.client.Query(findAllSql, s)
+	return handleCustomerRows(rows, err)
+}
 
+func (d CustomerRepositoryDb) FindAll() ([]Customer, *errs.AppError) {
 	findAllSql := "select customer_id, name, city, zipcode, date_of_birth, status from customers"
-
 	rows, err := d.client.Query(findAllSql)
+	return handleCustomerRows(rows, err)
+}
+
+func (d CustomerRepositoryDb) ById(id string) (*Customer, *errs.AppError) {
+	findByIdSql := "select customer_id, name, city, zipcode, date_of_birth, status from customers where customer_id=?"
+	row := d.client.QueryRow(findByIdSql, id)
+	var c Customer
+	err := row.Scan(&c.Id, &c.Name, &c.City, &c.Zipcode, &c.DateOfBirth, &c.Status)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errs.NewNotFoundError("Customer not found")
+		}
+		return nil, errs.NewInternalServerError("Unexpected database error")
+	}
+	return &c, nil
+}
+
+func handleCustomerRows(rows *sql.Rows, err error) ([]Customer, *errs.AppError) {
 	if err != nil {
 		log.Println(("error while querying customer table " + err.Error()))
-		return nil, err
+		return nil, errs.NewInternalServerError("Unexpected database error")
 	}
 	customers := make([]Customer, 0)
 	for rows.Next() {
@@ -41,22 +71,9 @@ func (d CustomerRepositoryDb) FindAll() ([]Customer, error) {
 		err := rows.Scan(&c.Id, &c.Name, &c.City, &c.Zipcode, &c.DateOfBirth, &c.Status)
 		if err != nil {
 			log.Println("error while scanning rows " + err.Error())
-			return nil, err
+			return nil, errs.NewInternalServerError("Unexpected database error")
 		}
 		customers = append(customers, c)
-
 	}
 	return customers, nil
-}
-
-func (d CustomerRepositoryDb) ById(id string) (*Customer, error) {
-	findByIdSql := "select customer_id, name, city, zipcode, date_of_birth, status from customers where customer_id=?"
-	row := d.client.QueryRow(findByIdSql, id)
-	var c Customer
-	err := row.Scan(&c.Id, &c.Name, &c.City, &c.Zipcode, &c.DateOfBirth, &c.Status)
-	if err != nil {
-		log.Println("error while scanning rows " + err.Error())
-		return nil, err
-	}
-	return &c, nil
 }

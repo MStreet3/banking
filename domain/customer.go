@@ -1,5 +1,14 @@
 package domain
 
+import "github.com/mstreet3/banking/errs"
+
+type CustomerStatus string
+
+const (
+	ACTIVE   CustomerStatus = "active"
+	INACTIVE CustomerStatus = "inactive"
+)
+
 type Customer struct {
 	Id          string
 	Name        string
@@ -10,6 +19,7 @@ type Customer struct {
 }
 
 type CustomerRepository interface {
-	FindAll() ([]Customer, error)
-	ById(string) (*Customer, error)
+	FindAll() ([]Customer, *errs.AppError)
+	FindAllByStatus(status CustomerStatus) ([]Customer, *errs.AppError)
+	ById(string) (*Customer, *errs.AppError)
 }
