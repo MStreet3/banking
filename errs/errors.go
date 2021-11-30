@@ -21,6 +21,13 @@ func NewInternalServerError(msg string) *AppError {
 	}
 }
 
+func NewValidationError(msg string) *AppError {
+	return &AppError{
+		Code:    http.StatusUnprocessableEntity,
+		Message: msg,
+	}
+}
+
 func (e AppError) AsMessage() *AppError {
 	return &AppError{
 		Message: e.Message,
