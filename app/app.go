@@ -30,10 +30,12 @@ func Start() {
 	dbClient := getDbClient()
 	customerRepository := domain.NewCustomerRepositoryDb(dbClient)
 	accountRepository := domain.NewAccountRepositoryDb(dbClient)
+	transactionRepository := domain.TransactionRepositoryStub{}
 
 	/* create a customer service from the data source */
 	customerService := service.NewCustomerService(customerRepository)
 	accountService := service.NewAccountService(accountRepository)
+	transactionService := service.NewTransactionService(transactionRepository)
 
 	/* define the service used by the customer handlers */
 	ch := CustomerHandlers{
@@ -44,11 +46,16 @@ func Start() {
 		service: accountService,
 	}
 
+	th := TransactionHandlers{
+		service: transactionService,
+	}
+
 	/* implement a get all customers route */
 	router.Path("/customers").Queries("status", "{status}").HandlerFunc(ch.getAllCustomersByStatus).Methods(http.MethodGet)
 	router.Path("/customers").HandlerFunc(ch.getAllCustomers).Methods(http.MethodGet)
 	router.HandleFunc("/customers/{customer_id:[0-9]+}", ch.getCustomer).Methods(http.MethodGet)
 	router.HandleFunc("/customers/{customer_id:[0-9]+}/account", ah.newAccount).Methods(http.MethodPost)
+	router.HandleFunc("/{account_id:[0-9]+}/transaction", th.newTransaction).Methods(http.MethodPost)
 
 	err := http.ListenAndServe("localhost:8080", router)
 
