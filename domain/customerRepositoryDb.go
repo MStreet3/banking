@@ -39,7 +39,7 @@ func (d CustomerRepositoryDb) ById(id string) (*Customer, *errs.AppError) {
 		if err == sql.ErrNoRows {
 			return nil, errs.NewNotFoundError("Customer not found")
 		}
-		return nil, errs.NewInternalServerError("Unexpected database error")
+		return nil, errs.UnexpectedDatabaseError()
 	}
 	return &c, nil
 }
@@ -49,7 +49,7 @@ func handleCustomerSelectQuery(db *sqlx.DB, q string, args ...interface{}) ([]Cu
 	err := db.Select(&customers, q, args...)
 	if err != nil {
 		log.Println("error while scanning rows " + err.Error())
-		return nil, errs.NewInternalServerError("Unexpected database error")
+		return nil, errs.UnexpectedDatabaseError()
 	}
 	return customers, nil
 

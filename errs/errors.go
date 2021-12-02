@@ -21,10 +21,21 @@ func NewInternalServerError(msg string) *AppError {
 	}
 }
 
+func UnexpectedDatabaseError() *AppError {
+	return NewInternalServerError("Unexpected database error")
+}
+
 func NewValidationError(msg string) *AppError {
 	return &AppError{
 		Code:    http.StatusUnprocessableEntity,
 		Message: msg,
+	}
+}
+
+func InsufficientFundsError() *AppError {
+	return &AppError{
+		Code:    http.StatusBadRequest,
+		Message: "insufficient funds",
 	}
 }
 

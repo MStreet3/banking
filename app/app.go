@@ -49,6 +49,7 @@ func Start() {
 	router.Path("/customers").HandlerFunc(ch.getAllCustomers).Methods(http.MethodGet)
 	router.HandleFunc("/customers/{customer_id:[0-9]+}", ch.getCustomer).Methods(http.MethodGet)
 	router.HandleFunc("/customers/{customer_id:[0-9]+}/account", ah.newAccount).Methods(http.MethodPost)
+	router.HandleFunc("/{account_id:[0-9]+}/transaction", ah.newTransaction).Methods(http.MethodPost)
 
 	err := http.ListenAndServe("localhost:8080", router)
 
