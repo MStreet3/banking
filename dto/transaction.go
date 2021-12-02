@@ -9,8 +9,11 @@ type NewTransactionRequest struct {
 }
 
 type NewTransactionResponse struct {
-	TransactionId  string  `json:"transaction_id"`
-	AccountBalance float64 `json:"account_balance"`
+	TransactionId   string  `json:"transaction_id"`
+	AccountId       string  `json:"account_id"`
+	Amount          float64 `json:"new_balance"`
+	TransactionType string  `json:"transaction_type"`
+	TransactionDate string  `json:"transaction_date"`
 }
 
 func (req NewTransactionRequest) Validate() *errs.AppError {

@@ -2,7 +2,6 @@ package domain
 
 import (
 	"github.com/mstreet3/banking/dto"
-	"github.com/mstreet3/banking/errs"
 )
 
 type Transaction struct {
@@ -13,12 +12,14 @@ type Transaction struct {
 	TransactionDate string `db:"transaction_date"`
 }
 
-type TransactionRepository interface {
-	Save(Transaction) (*Transaction, *Account, *errs.AppError)
+func (t Transaction) ToTransactionResponseDto() dto.NewTransactionResponse {
+	return dto.NewTransactionResponse{
+		TransactionId:   t.TransactionId,
+		TransactionType: t.TransactionType,
+		TransactionDate: t.TransactionDate,
+	}
 }
 
-func (t Transaction) ToNewTransactionResponseDto() dto.NewTransactionResponse {
-	return dto.NewTransactionResponse{
-		TransactionId: t.TransactionId,
-	}
+func (t Transaction) IsWithdrawal() bool {
+	return t.TransactionType == "withdrawal"
 }
