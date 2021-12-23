@@ -26,9 +26,8 @@ type routeRequiredClaims map[entities.AppRoute]roleClaims
 type Claims struct {
 	Username   string   `json:"username"`
 	Role       string   `json:"role"`
-	Expiry     int64    `json:"expiry"`
-	Accounts   []string `json:"accounts"`
-	CustomerId string   `json:"customer_id"`
+	Accounts   []string `json:"accounts,omitempty"`
+	CustomerId string   `json:"customer_id,omitempty"`
 }
 
 type DefaultAuthMiddleware struct {
@@ -98,8 +97,49 @@ func buildVerifyURL(token string) string {
 	return u.String()
 }
 
+func verifyAccountId(accts []string, id string) bool {
+	found := false
+	for _, acct := range accts {
+		if acct == id {
+			found = true
+			break
+		}
+	}
+	return found
+}
+
 func (amw *DefaultAuthMiddleware) isAuthorized(c Claims, route entities.AppRoute, vars map[string]string) bool {
-	return true
+	roleAuthorizedForRoute := false
+	claimsVerified := false
+
+	/* check that role is authorized for the route */
+	allowed, present := amw.routeToRoleAccessMap[route][entities.Role(c.Role)]
+	if present && allowed {
+		roleAuthorizedForRoute = true
+	}
+
+	claimsForRole, checkRole := amw.routeToClaimsMap[route]
+
+	if !checkRole {
+		return roleAuthorizedForRoute
+	}
+
+	claimsToVerify, checkClaims := claimsForRole[entities.Role(c.Role)]
+
+	if !checkClaims {
+		return roleAuthorizedForRoute
+	}
+
+	for _, claim := range claimsToVerify {
+		if claim == "customer_id" {
+			claimsVerified = c.CustomerId == vars[claim]
+		}
+		if claim == "account_id" {
+			claimsVerified = verifyAccountId(c.Accounts, vars[claim])
+		}
+	}
+
+	return roleAuthorizedForRoute && claimsVerified
 }
 
 func (amw *DefaultAuthMiddleware) TokenExists(next http.Handler) http.Handler {
@@ -124,8 +164,20 @@ func (amw *DefaultAuthMiddleware) VerifyClaims(next http.Handler) http.Handler {
 		logger.Info(fmt.Sprintf("verify claims for route: %s", route))
 		u := buildVerifyURL(amw.accessToken)
 		if response, err := http.Get(u); err != nil {
-			utils.WriteResponse(w, http.StatusUnauthorized, fmt.Sprintf("Error while sending..."+err.Error()))
+			utils.WriteResponse(w, http.StatusUnauthorized, fmt.Sprintf("Error sending request to auth server: "+err.Error()))
 		} else {
+			/* return the response body as an error verify failed */
+			if response.StatusCode != http.StatusOK {
+				var msg string
+				err = json.NewDecoder(response.Body).Decode(&msg)
+				if err != nil {
+					msg = fmt.Sprintf("Error while decoding response from auth server: %s", err.Error())
+				}
+				utils.WriteResponse(w, http.StatusUnauthorized, msg)
+				return
+			}
+
+			/* verify claims if status is ok*/
 			var claims Claims
 			if err = json.NewDecoder(response.Body).Decode(&claims); err != nil {
 				utils.WriteResponse(w, http.StatusUnauthorized, fmt.Sprintf("Error while decoding response from auth server:"+err.Error()))
