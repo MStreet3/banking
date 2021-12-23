@@ -8,6 +8,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jmoiron/sqlx"
 	"github.com/mstreet3/banking/domain"
+	"github.com/mstreet3/banking/entities"
+	"github.com/mstreet3/banking/middleware"
 	"github.com/mstreet3/banking/service"
 )
 
@@ -31,7 +33,7 @@ func Start() {
 	customerRepository := domain.NewCustomerRepositoryDb(dbClient)
 	accountRepository := domain.NewAccountRepositoryDb(dbClient)
 
-	/* create a customer service from the data source */
+	/* create services from the data source */
 	customerService := service.NewCustomerService(customerRepository)
 	accountService := service.NewAccountService(accountRepository)
 
@@ -45,11 +47,28 @@ func Start() {
 	}
 
 	/* implement a get all customers route */
-	router.Path("/customers").Queries("status", "{status}").HandlerFunc(ch.getAllCustomersByStatus).Methods(http.MethodGet)
-	router.Path("/customers").HandlerFunc(ch.getAllCustomers).Methods(http.MethodGet)
-	router.HandleFunc("/customers/{customer_id:[0-9]+}", ch.getCustomer).Methods(http.MethodGet)
-	router.HandleFunc("/customers/{customer_id:[0-9]+}/account", ah.newAccount).Methods(http.MethodPost)
-	router.HandleFunc("/{account_id:[0-9]+}/transaction", ah.newTransaction).Methods(http.MethodPost)
+	router.Path("/customers").
+		Queries("status", "{status}").
+		HandlerFunc(ch.getAllCustomersByStatus).
+		Methods(http.MethodGet).
+		Name(string(entities.GetAllCustomersByStatus))
+	router.Path("/customers").
+		HandlerFunc(ch.getAllCustomers).
+		Methods(http.MethodGet).
+		Name(string(entities.GetAllCustomers))
+	router.HandleFunc("/customers/{customer_id:[0-9]+}", ch.getCustomer).
+		Methods(http.MethodGet).
+		Name(string(entities.GetCustomerById))
+	router.HandleFunc("/customers/{customer_id:[0-9]+}/account", ah.newAccount).
+		Methods(http.MethodPost).
+		Name(string(entities.NewAccount))
+	router.HandleFunc("/{account_id:[0-9]+}/transaction", ah.newTransaction).
+		Methods(http.MethodPost).
+		Name(string(entities.NewTransaction))
+
+	// add middleware
+	authMiddlware := middleware.NewAuthMiddleware()
+	router.Use(authMiddlware.TokenExists, authMiddlware.VerifyClaims)
 
 	err := http.ListenAndServe("localhost:8080", router)
 
