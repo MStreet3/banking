@@ -1,12 +1,12 @@
 package app
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/mstreet3/banking/dto"
 	"github.com/mstreet3/banking/service"
+	"github.com/mstreet3/banking/utils"
 )
 
 type CustomerHandlers struct {
@@ -19,9 +19,9 @@ func (ch *CustomerHandlers) getAllCustomers(w http.ResponseWriter, r *http.Reque
 
 	/* handle the response from the service */
 	if err != nil {
-		writeResponse(w, err.Code, err.AsMessage())
+		utils.WriteResponse(w, err.Code, err.AsMessage())
 	} else {
-		writeResponse(w, http.StatusOK, customers)
+		utils.WriteResponse(w, http.StatusOK, customers)
 	}
 }
 
@@ -35,9 +35,9 @@ func (ch *CustomerHandlers) getAllCustomersByStatus(w http.ResponseWriter, r *ht
 
 	/* handle the response from the service */
 	if err != nil {
-		writeResponse(w, err.Code, err.AsMessage())
+		utils.WriteResponse(w, err.Code, err.AsMessage())
 	} else {
-		writeResponse(w, http.StatusOK, customers)
+		utils.WriteResponse(w, http.StatusOK, customers)
 	}
 }
 
@@ -51,18 +51,9 @@ func (ch *CustomerHandlers) getCustomer(w http.ResponseWriter, r *http.Request) 
 
 	/* handle the response from the service */
 	if err != nil {
-		writeResponse(w, err.Code, err.AsMessage())
+		utils.WriteResponse(w, err.Code, err.AsMessage())
 	} else {
-		writeResponse(w, http.StatusOK, customer)
-	}
-
-}
-
-func writeResponse(w http.ResponseWriter, code int, data interface{}) {
-	w.Header().Add("Content-Type", "application/json")
-	w.WriteHeader(code)
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		panic(err)
+		utils.WriteResponse(w, http.StatusOK, customer)
 	}
 
 }

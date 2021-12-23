@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/mstreet3/banking/dto"
 	"github.com/mstreet3/banking/service"
+	"github.com/mstreet3/banking/utils"
 )
 
 type AccountHandlers struct {
@@ -21,17 +22,17 @@ func (ah AccountHandlers) newAccount(w http.ResponseWriter, r *http.Request) {
 	var req dto.NewAccountRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		writeResponse(w, http.StatusBadRequest, err.Error())
+		utils.WriteResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	req.CustomerId = id
 	resp, appErr := ah.service.NewAccount(req)
 	if appErr != nil {
-		writeResponse(w, appErr.Code, appErr.AsMessage())
+		utils.WriteResponse(w, appErr.Code, appErr.AsMessage())
 		return
 	}
-	writeResponse(w, http.StatusCreated, resp)
+	utils.WriteResponse(w, http.StatusCreated, resp)
 
 }
 
@@ -43,15 +44,15 @@ func (ah AccountHandlers) newTransaction(w http.ResponseWriter, r *http.Request)
 	var req dto.NewTransactionRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		writeResponse(w, http.StatusBadRequest, err.Error())
+		utils.WriteResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	req.AccountId = id
 	resp, appErr := ah.service.MakeTransaction(req)
 	if appErr != nil {
-		writeResponse(w, appErr.Code, appErr.AsMessage())
+		utils.WriteResponse(w, appErr.Code, appErr.AsMessage())
 		return
 	}
-	writeResponse(w, http.StatusCreated, resp)
+	utils.WriteResponse(w, http.StatusCreated, resp)
 }
