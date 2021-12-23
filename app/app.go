@@ -67,8 +67,8 @@ func Start() {
 		Name(string(entities.NewTransaction))
 
 	// add middleware
-	authMiddlware := middleware.NewAuthMiddleware()
-	router.Use(authMiddlware.TokenExists, authMiddlware.VerifyClaims)
+	authMiddleware := middleware.NewAuthMiddleware()
+	router.Use(authMiddleware...)
 
 	err := http.ListenAndServe("localhost:8080", router)
 

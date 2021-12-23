@@ -74,10 +74,14 @@ func newRouteRequiredClaimsMap() routeRequiredClaims {
 
 }
 
-func NewAuthMiddleware() *DefaultAuthMiddleware {
-	return &DefaultAuthMiddleware{
+func NewAuthMiddleware() []mux.MiddlewareFunc {
+	amw := DefaultAuthMiddleware{
 		routeToRoleAccessMap: newRouteAuthorizationMap(),
 		routeToClaimsMap:     newRouteRequiredClaimsMap(),
+	}
+	return []mux.MiddlewareFunc{
+		amw.TokenExists,
+		amw.VerifyClaims,
 	}
 }
 
