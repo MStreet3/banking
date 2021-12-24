@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
-	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/mstreet3/banking/entities"
@@ -18,11 +16,11 @@ type AuthMiddleware interface {
 	VerifyClaims(http.Handler) http.Handler
 }
 
-type roleAccess map[entities.Role]bool
-type roleClaims map[entities.Role][]string
-type routeAuthorization map[entities.AppRoute]roleAccess
-type routeRequiredClaims map[entities.AppRoute]roleClaims
-
+type DefaultAuthMiddleware struct {
+	routeToRoleAccessMap routeAuthorization
+	routeToClaimsMap     routeRequiredClaims
+	accessToken          string
+}
 type Claims struct {
 	Username   string   `json:"username"`
 	Role       string   `json:"role"`
@@ -30,11 +28,10 @@ type Claims struct {
 	CustomerId string   `json:"customer_id,omitempty"`
 }
 
-type DefaultAuthMiddleware struct {
-	routeToRoleAccessMap routeAuthorization
-	routeToClaimsMap     routeRequiredClaims
-	accessToken          string
-}
+type roleAccess map[entities.Role]bool
+type roleClaims map[entities.Role][]string
+type routeAuthorization map[entities.AppRoute]roleAccess
+type routeRequiredClaims map[entities.AppRoute]roleClaims
 
 func newRouteAuthorizationMap() routeAuthorization {
 	auth := make(map[entities.AppRoute]roleAccess)
@@ -85,33 +82,7 @@ func NewAuthMiddleware() []mux.MiddlewareFunc {
 	}
 }
 
-func getBearerToken(h string) string {
-	components := strings.Fields(h)
-	if len(components) == 2 {
-		return strings.TrimSpace(components[1])
-	}
-	return ""
-}
-
-func buildVerifyURL(token string) string {
-	u := url.URL{Host: "localhost:9000", Path: "/auth/verify", Scheme: "http"}
-	q := u.Query()
-	q.Add("token", token)
-	u.RawQuery = q.Encode()
-	return u.String()
-}
-
-func verifyAccountId(accts []string, id string) bool {
-	found := false
-	for _, acct := range accts {
-		if acct == id {
-			found = true
-			break
-		}
-	}
-	return found
-}
-
+/* todo: add unit tests on isAuthorized */
 func (amw *DefaultAuthMiddleware) isAuthorized(c Claims, route entities.AppRoute, vars map[string]string) bool {
 	roleAuthorizedForRoute := false
 	claimsVerified := false
@@ -122,18 +93,21 @@ func (amw *DefaultAuthMiddleware) isAuthorized(c Claims, route entities.AppRoute
 		roleAuthorizedForRoute = true
 	}
 
+	/* check if the route has any verifiable claims for roles */
 	claimsForRole, checkRole := amw.routeToClaimsMap[route]
 
 	if !checkRole {
 		return roleAuthorizedForRoute
 	}
 
+	/* check if the current role claims to verify */
 	claimsToVerify, checkClaims := claimsForRole[entities.Role(c.Role)]
 
 	if !checkClaims {
 		return roleAuthorizedForRoute
 	}
 
+	/* verify all claims for the role */
 	for _, claim := range claimsToVerify {
 		if claim == "customer_id" {
 			claimsVerified = c.CustomerId == vars[claim]
@@ -149,51 +123,65 @@ func (amw *DefaultAuthMiddleware) isAuthorized(c Claims, route entities.AppRoute
 func (amw *DefaultAuthMiddleware) TokenExists(next http.Handler) http.Handler {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
-		accessToken := getBearerToken(authHeader)
-		if accessToken != "" {
-			amw.accessToken = accessToken
-			next.ServeHTTP(w, r)
-		} else {
+		accessToken, ok := getBearerToken(authHeader)
+
+		if !ok {
 			utils.WriteResponse(w, http.StatusUnauthorized, "invalid access token")
+			return
 		}
 
+		amw.accessToken = accessToken
+		next.ServeHTTP(w, r)
 	}
 	return http.HandlerFunc(handler)
 }
 
 func (amw *DefaultAuthMiddleware) VerifyClaims(next http.Handler) http.Handler {
+	var msg string
 	handler := func(w http.ResponseWriter, r *http.Request) {
+		/* get route data and build request to auth server */
 		route := entities.AppRoute(mux.CurrentRoute(r).GetName())
 		vars := mux.Vars(r)
 		logger.Info(fmt.Sprintf("verify claims for route: %s", route))
 		u := buildVerifyURL(amw.accessToken)
-		if response, err := http.Get(u); err != nil {
-			utils.WriteResponse(w, http.StatusUnauthorized, fmt.Sprintf("Error sending request to auth server: "+err.Error()))
-		} else {
-			/* return the response body as an error verify failed */
-			if response.StatusCode != http.StatusOK {
-				var msg string
-				err = json.NewDecoder(response.Body).Decode(&msg)
-				if err != nil {
-					msg = fmt.Sprintf("Error while decoding response from auth server: %s", err.Error())
-				}
-				utils.WriteResponse(w, http.StatusUnauthorized, msg)
-				return
-			}
 
-			/* verify claims if status is ok*/
-			var claims Claims
-			if err = json.NewDecoder(response.Body).Decode(&claims); err != nil {
-				utils.WriteResponse(w, http.StatusUnauthorized, fmt.Sprintf("Error while decoding response from auth server:"+err.Error()))
-				return
+		/* get jwt verification response from auth server */
+		response, err := http.Get(u)
+		if err != nil {
+			msg = fmt.Sprintf("Error sending request to auth server: " + err.Error())
+			utils.WriteResponse(w, http.StatusUnauthorized, msg)
+			return
+		}
+
+		/* return the error if jwt verification failed */
+		if response.StatusCode != http.StatusOK {
+			err = json.NewDecoder(response.Body).Decode(&msg)
+			if err != nil {
+				msg = fmt.Sprintf("Error while decoding response from auth server: %s", err.Error())
 			}
-			if authorized := amw.isAuthorized(claims, route, vars); authorized {
-				next.ServeHTTP(w, r)
-				return
-			}
+			utils.WriteResponse(w, http.StatusUnauthorized, msg)
+			return
+		}
+
+		/* status OK means token is authentic and non expired, parse the claims */
+		var claims Claims
+		err = json.NewDecoder(response.Body).Decode(&claims)
+
+		if err != nil {
+			msg = fmt.Sprintf("Error while decoding response from auth server: " + err.Error())
+			utils.WriteResponse(w, http.StatusUnauthorized, msg)
+			return
+		}
+
+		/* check if token claims authorize the request */
+		authorized := amw.isAuthorized(claims, route, vars)
+		if !authorized {
 			utils.WriteResponse(w, http.StatusUnauthorized, "unauthorized request")
 			return
 		}
+
+		/* request is authentic and authorized, serve next route in the chain */
+		next.ServeHTTP(w, r)
 
 	}
 	return http.HandlerFunc(handler)
