@@ -137,7 +137,8 @@ func (amw *DefaultAuthMiddleware) TokenExists(next http.Handler) http.Handler {
 }
 
 func (amw *DefaultAuthMiddleware) VerifyClaims(next http.Handler) http.Handler {
-	var msg string
+	var errMsg string
+	var claims Claims
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		/* get route data and build request to auth server */
 		route := entities.AppRoute(mux.CurrentRoute(r).GetName())
@@ -148,28 +149,27 @@ func (amw *DefaultAuthMiddleware) VerifyClaims(next http.Handler) http.Handler {
 		/* get jwt verification response from auth server */
 		response, err := http.Get(u)
 		if err != nil {
-			msg = fmt.Sprintf("Error sending request to auth server: " + err.Error())
-			utils.WriteResponse(w, http.StatusUnauthorized, msg)
+			errMsg = fmt.Sprintf("Error sending request to auth server: " + err.Error())
+			utils.WriteResponse(w, http.StatusUnauthorized, errMsg)
 			return
 		}
 
 		/* return the error if jwt verification failed */
 		if response.StatusCode != http.StatusOK {
-			err = json.NewDecoder(response.Body).Decode(&msg)
+			err = json.NewDecoder(response.Body).Decode(&errMsg)
 			if err != nil {
-				msg = fmt.Sprintf("Error while decoding response from auth server: %s", err.Error())
+				errMsg = fmt.Sprintf("Error while decoding response from auth server: %s", err.Error())
 			}
-			utils.WriteResponse(w, http.StatusUnauthorized, msg)
+			utils.WriteResponse(w, http.StatusUnauthorized, errMsg)
 			return
 		}
 
 		/* status OK means token is authentic and non expired, parse the claims */
-		var claims Claims
 		err = json.NewDecoder(response.Body).Decode(&claims)
 
 		if err != nil {
-			msg = fmt.Sprintf("Error while decoding response from auth server: " + err.Error())
-			utils.WriteResponse(w, http.StatusUnauthorized, msg)
+			errMsg = fmt.Sprintf("Error while decoding response from auth server: " + err.Error())
+			utils.WriteResponse(w, http.StatusUnauthorized, errMsg)
 			return
 		}
 
