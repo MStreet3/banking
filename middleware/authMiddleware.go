@@ -82,16 +82,21 @@ func NewAuthMiddleware() []mux.MiddlewareFunc {
 	}
 }
 
+func (amw *DefaultAuthMiddleware) isRoleAuthorized(c Claims, route entities.AppRoute) bool {
+	pass := false
+	/* check that role is authorized for the route */
+	allowed, prs := amw.routeToRoleAccessMap[route][entities.Role(c.Role)]
+	if prs && allowed {
+		pass = true
+	}
+	return pass
+}
+
 /* todo: add unit tests on isAuthorized */
 func (amw *DefaultAuthMiddleware) isAuthorized(c Claims, route entities.AppRoute, vars map[string]string) bool {
-	roleAuthorizedForRoute := false
-	claimsVerified := false
+	roleAuthorizedForRoute := amw.isRoleAuthorized(c, route)
 
-	/* check that role is authorized for the route */
-	allowed, present := amw.routeToRoleAccessMap[route][entities.Role(c.Role)]
-	if present && allowed {
-		roleAuthorizedForRoute = true
-	}
+	claimsVerified := false
 
 	/* check if the route has any verifiable claims for roles */
 	claimsForRole, checkRole := amw.routeToClaimsMap[route]
@@ -100,7 +105,7 @@ func (amw *DefaultAuthMiddleware) isAuthorized(c Claims, route entities.AppRoute
 		return roleAuthorizedForRoute
 	}
 
-	/* check if the current role claims to verify */
+	/* check if the current role has claims to verify */
 	claimsToVerify, checkClaims := claimsForRole[entities.Role(c.Role)]
 
 	if !checkClaims {
@@ -121,7 +126,7 @@ func (amw *DefaultAuthMiddleware) isAuthorized(c Claims, route entities.AppRoute
 }
 
 func (amw *DefaultAuthMiddleware) TokenExists(next http.Handler) http.Handler {
-	handler := func(w http.ResponseWriter, r *http.Request) {
+	f := func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		accessToken, ok := getBearerToken(authHeader)
 
@@ -133,7 +138,7 @@ func (amw *DefaultAuthMiddleware) TokenExists(next http.Handler) http.Handler {
 		amw.accessToken = accessToken
 		next.ServeHTTP(w, r)
 	}
-	return http.HandlerFunc(handler)
+	return http.HandlerFunc(f)
 }
 
 func (amw *DefaultAuthMiddleware) VerifyClaims(next http.Handler) http.Handler {
